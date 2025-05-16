@@ -270,6 +270,7 @@ class ECotServer:
         self,
         model_path: Union[str, Path],
         attn_implementation: Optional[str] = "flash_attention_2",
+        save_files: bool = True,
     ):
         """
         ECot模型服务器；提供'/act'接口来预测给定图像+指令的动作。
@@ -278,6 +279,7 @@ class ECotServer:
         """
         self.model_path = model_path
         self.attn_implementation = attn_implementation
+        self.save_files = save_files
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.tags = [f" {tag}" for tag in get_cot_tags_list()]
 
@@ -345,14 +347,15 @@ class ECotServer:
                 reasoning_image, metadata = create_reasoning_image(image, generated_text, self.tags)
                 
                 # 保存数据到文件夹
-                save_dir = save_prediction_data(
-                    image, 
-                    action, 
-                    reasoning_image, 
-                    generated_text, 
-                    metadata,
-                    instruction
-                )
+                if self.save_files:
+                    save_dir = save_prediction_data(
+                        image, 
+                        action, 
+                        reasoning_image, 
+                        generated_text, 
+                        metadata,
+                        instruction
+                    )
                 logging.info(f"预测数据已保存到: {save_dir}")
                 
             except Exception as e:
@@ -423,12 +426,13 @@ class ServerConfig:
     # 服务器配置
     host: str = "0.0.0.0"                                               # 主机IP地址
     port: int = 8000                                                    # 主机端口
+    save_files: bool = True                                          # 是否保存预测数据
 
 
 @draccus.wrap()
 def run_server(cfg: ServerConfig) -> None:
     """启动ECot服务器"""
-    server = ECotServer(cfg.model_path)
+    server = ECotServer(cfg.model_path, save_files=cfg.save_files)
     server.run(cfg.host, port=cfg.port)
 
 
