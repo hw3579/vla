@@ -46,6 +46,7 @@ import logging
 import traceback
 import enum
 import textwrap
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional, Union, List, Tuple
@@ -64,6 +65,42 @@ from transformers import AutoConfig, AutoImageProcessor, AutoModelForVision2Seq,
 # 导入JSON-Numpy扩展以支持numpy数组的JSON序列化
 import json_numpy
 json_numpy.patch()
+
+# 检查predictions目录
+def check_predictions_directory(directory="predictions", warn_if_non_empty=True):
+    """
+    检查predictions目录是否存在且是否非空
+    
+    Args:
+        directory: 要检查的目录名称
+        warn_if_non_empty: 如果目录非空是否显示警告
+        
+    Returns:
+        bool: 目录是否存在且非空
+    """
+    # 确保目录存在
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        return False
+    
+    # 检查目录是否为空
+    items = os.listdir(directory)
+    is_non_empty = len(items) > 0
+    
+    if is_non_empty and warn_if_non_empty:
+        print("\033[93m警告: 'predictions'目录非空，包含", len(items), "个项目。")
+        print("如果继续，新的预测结果将添加到此目录中。")
+        print("是否继续? [y/N]\033[0m")
+        
+        response = input().strip().lower()
+        if response != 'y' and response != 'yes':
+            print("已取消启动服务器。")
+            sys.exit(0)
+    
+    return is_non_empty
+
+
+
 
 # === 实用工具函数 ===
 def split_reasoning(text, tags):
@@ -203,7 +240,28 @@ def create_reasoning_image(image, generated_text, tags):
 
     base = Image.fromarray(np.ones((480, 640, 3), dtype=np.uint8) * 255)
     draw = ImageDraw.Draw(base)
-    font = ImageFont.load_default(size=14)
+    #####
+        # 使用 truetype 加载字体并指定大小
+    try:
+        # 尝试加载一个系统字体
+        font = ImageFont.truetype("DejaVuSans.ttf", 14)
+    except IOError:
+        try:
+            # 如果找不到，尝试另一个常见字体
+            font = ImageFont.truetype("Arial.ttf", 14)
+        except IOError:
+            # 如果都找不到，使用默认字体
+            font = ImageFont.load_default()
+            logging.warning("无法加载指定字体，使用默认字体")
+    #####
+    #     解释
+    # 问题出现的原因是:
+
+    # 在某些旧版本的 PIL/Pillow 中，ImageFont.load_default() 不接受任何参数
+    # 在较新版本中，它可能支持 size 参数
+    # 最安全的方法是使用 truetype() 方法来加载指定大小的字体，如方法二所示。这样无论您的 Pillow 版本如何，代码都能正常工作。
+    ####
+    # font = ImageFont.load_default(size=14)
     color = (0,0,0)
     draw.text((30, 30), caption, color, font=font)
 
@@ -432,6 +490,11 @@ class ServerConfig:
 @draccus.wrap()
 def run_server(cfg: ServerConfig) -> None:
     """启动ECot服务器"""
+
+    # 检查predictions目录
+    if cfg.save_files:
+        check_predictions_directory()
+    
     server = ECotServer(cfg.model_path, save_files=cfg.save_files)
     server.run(cfg.host, port=cfg.port)
 
