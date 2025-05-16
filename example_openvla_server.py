@@ -217,3 +217,4 @@ def deploy(cfg: DeployConfig) -> None:
 
 if __name__ == "__main__":
     deploy()
+    # Example usage: python example_openvla_server.py --port 8000
