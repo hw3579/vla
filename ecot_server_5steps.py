@@ -448,23 +448,29 @@ class ECotServer:
                     )
                     logging.info(f"预测数据已保存到: {save_dir}")
                 
+                # 如果使用5step模式，将步骤计数器信息添加到metadata中保存
+                if self.use_5step and session_id is not None and session_id in self.sessions:
+                    step_info = {
+                        "step_counter": self.sessions[session_id].update_counter,
+                        "high_level_frequency": self.sessions[session_id].highlevel_frequency
+                    }
+                    # 将步骤信息添加到metadata.json文件
+                    metadata_path = os.path.join(save_dir, "metadata.json")
+                    if os.path.exists(metadata_path):
+                        with open(metadata_path, "r") as f:
+                            meta_data = json.load(f)
+                        meta_data.update(step_info)
+                        with open(metadata_path, "w") as f:
+                            json.dump(meta_data, f, indent=2)
+                
             except Exception as e:
                 logging.error(f"创建或保存推理数据时出错: {str(e)}")
                 logging.error(traceback.format_exc())
                 # 如果可视化处理失败，仍然返回动作坐标
                 return JSONResponse(action.tolist() if hasattr(action, "tolist") else action)
             
-            # 构建响应
-            result = {
-                "action": action.tolist() if hasattr(action, "tolist") else action,
-                "reasoning_image": np.array(reasoning_image),
-                "generated_text": generated_text
-            }
-
-            # 如果使用5step模式，添加提示状态信息
-            if self.use_5step and session_id is not None and session_id in self.sessions:
-                result["step_counter"] = self.sessions[session_id].update_counter
-                result["high_level_frequency"] = self.sessions[session_id].highlevel_frequency
+            # 只返回动作坐标，与原始版本一致
+            result = action.tolist() if hasattr(action, "tolist") else action
             
             if double_encode:
                 return JSONResponse(json_numpy.dumps(result))

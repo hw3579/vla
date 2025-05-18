@@ -17,3 +17,14 @@ pip install --editable ../vllm
 
 注意flashattn 这个要编译
 MAX_JOBS=4 pip install flash-attn --no-build-isolation
+
+
+
+
+<!-- 
+
+if ($?PYTHONPATH) then
+    setenv PYTHONPATH /cs/student/projects1/rai/2024/jiaqiyao/pkg/lib/python3.9/site-packages:$PYTHONPATH
+else
+    setenv PYTHONPATH /cs/student/projects1/rai/2024/jiaqiyao/pkg/lib/python3.9/site-packages
+endif -->
