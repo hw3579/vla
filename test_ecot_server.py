@@ -212,116 +212,53 @@ def test_ecot_server(image_path=None, instruction=None, host="0.0.0.0", port=800
     start_time = time.time()
     print(f"向 http://{host}:{port}/act 发送请求...")
     
-    try:
-        response = requests.post(
-            f"http://{host}:{port}/act",
-            json=payload,
-            timeout=120  # 设置超时时间为2分钟
-        )
+    response = requests.post(
+        f"http://{host}:{port}/act",
+        json=payload,
+        timeout=120  # 设置超时时间为2分钟
+    )
+    
+    # 检查响应状态
+    response.raise_for_status()
+    
+    # 解析响应
+    result = response.json()
+    end_time = time.time()
+    print(f"请求完成，耗时: {end_time - start_time:.2f}秒")
+    
+    # 直接使用结果作为动作，其他字段设为None
+    action = result
+    generated_text = None
+    
+    # 显示推理时间和结果
+    print("\n=== 服务器响应 ===")
+    print(f"推理时间: {end_time - start_time:.2f}秒")
+    print(f"预测动作: {action}")
+    
+    # 由于没有reasoning_image，直接进入else分支
+    print("服务器仅返回动作数组，推理图像和文本保存在服务器的predictions目录中")
+    
+    # 保存输入图像和结果
+    if save_result:
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        save_dir = "test_results"
+        os.makedirs(save_dir, exist_ok=True)
         
-        # 检查响应状态
-        response.raise_for_status()
+        # 保存原始图像
+        input_img_path = f"{save_dir}/input_{timestamp}.png"
+        Image.fromarray(image).save(input_img_path)
+        print(f"输入图像已保存到: {input_img_path}")
         
-        # 解析响应
-        result = response.json()
-        end_time = time.time()
-        print(f"请求完成，耗时: {end_time - start_time:.2f}秒")
-        
-        # 提取结果
-        action = result.get("action")
-        generated_text = result.get("generated_text")
-        
-        # 显示推理时间和结果
-        print("\n=== 服务器响应 ===")
-        print(f"推理时间: {end_time - start_time:.2f}秒")
-        print(f"预测动作: {action}")
-        
-        # 判断是否有reasoning_image
-        if "reasoning_image" in result:
-            reasoning_image = np.array(result["reasoning_image"])
-            
-            # 显示推理图像
-            plt.figure(figsize=(15, 10))
-            plt.imshow(reasoning_image)
-            plt.axis('off')
-            plt.title(f"指令: {instruction}")
-            
-            # 保存结果
-            if save_result:
-                timestamp = time.strftime("%Y%m%d_%H%M%S")
-                save_dir = "test_results"
-                os.makedirs(save_dir, exist_ok=True)
-                
-                # 保存原始图像
-                input_img_path = f"{save_dir}/input_{timestamp}.png"
-                Image.fromarray(image).save(input_img_path)
-                print(f"输入图像已保存到: {input_img_path}")
-                
-                # 保存推理图像
-                output_img_path = f"{save_dir}/result_{timestamp}.png"
-                plt.savefig(output_img_path)
-                print(f"结果图像已保存到: {output_img_path}")
-                
-                # 保存文本
-                text_path = f"{save_dir}/text_{timestamp}.txt"
-                with open(text_path, "w") as f:
-                    f.write(f"指令: {instruction}\n\n")
-                    f.write(f"预测动作: {action}\n\n")
-                    if generated_text:
-                        f.write("生成文本:\n")
-                        f.write(generated_text)
-                print(f"结果文本已保存到: {text_path}")
-                
-                # 如果有会话信息，保存会话状态
-                if session_id:
-                    step_counter = result.get("step_counter", 0)
-                    high_level_frequency = result.get("high_level_frequency", 0)
-                    if step_counter or high_level_frequency:
-                        session_info = {
-                            "session_id": session_id,
-                            "step_counter": step_counter,
-                            "high_level_frequency": high_level_frequency
-                        }
-                        session_path = f"{save_dir}/session_{timestamp}.json"
-                        with open(session_path, "w") as f:
-                            json.dump(session_info, f, indent=2)
-                        print(f"会话信息已保存到: {session_path}")
-            
-            plt.show()
-        else:
-            print("警告: 响应中没有reasoning_image")
-            
-            # 仍然保存输入图像和结果
-            if save_result:
-                timestamp = time.strftime("%Y%m%d_%H%M%S")
-                save_dir = "test_results"
-                os.makedirs(save_dir, exist_ok=True)
-                
-                # 保存原始图像
-                input_img_path = f"{save_dir}/input_{timestamp}.png"
-                Image.fromarray(image).save(input_img_path)
-                
-                # 保存文本
-                text_path = f"{save_dir}/text_{timestamp}.txt"
-                with open(text_path, "w") as f:
-                    f.write(f"指令: {instruction}\n\n")
-                    f.write(f"预测动作: {action}\n\n")
-                    if generated_text:
-                        f.write("生成文本:\n")
-                        f.write(generated_text)
-                
-        # 打印生成的文本
-        if generated_text:
-            print("\n=== 生成文本摘要 ===")
-            # 只显示文本的前300个字符
-            print(f"{generated_text[:300]}...(省略)")
-            print(f"完整文本已保存到结果文件中")
-            
-        return result
-        
-    except requests.exceptions.RequestException as e:
-        print(f"请求失败: {str(e)}")
-        return None
+        # 保存文本
+        text_path = f"{save_dir}/text_{timestamp}.txt"
+        with open(text_path, "w") as f:
+            f.write(f"指令: {instruction}\n\n")
+            f.write(f"预测动作: {action}\n\n")
+        print(f"结果文本已保存到: {text_path}")
+    
+    # 不再尝试打印生成的文本，因为服务器不返回它
+    
+    return result
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="测试ECot服务器")
