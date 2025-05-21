@@ -532,7 +532,7 @@ class ServerConfig:
     host: str = "0.0.0.0"                                               # 主机IP地址
     port: int = 8000                                                    # 主机端口
     save_files: bool = True                                          # 是否保存预测数据
-    use_5step: bool = False                        # 是否使用5step模式
+    use_5step: bool = True                        # 是否使用5step模式
 
 
 
