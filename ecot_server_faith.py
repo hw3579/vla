@@ -36,8 +36,8 @@ response = requests.post(
 ).json()
 
 # 获取结果
-action = response["action"]
-faith_scores = response["faith_scores"]  # 8个faithfulness分数
+action = response  # 返回7个元素的numpy数组
+# 注意：faith_scores现在只保存在服务器端的metadata中，不在响应中返回
 ```
 """
 
@@ -588,23 +588,13 @@ class ECotServerFaith:
             except Exception as e:
                 logging.error(f"创建或保存推理数据时出错: {str(e)}")
                 logging.error(traceback.format_exc())
-                # 如果可视化处理失败，仍然返回动作坐标和faith分数
-                result = {
-                    "action": action.tolist() if hasattr(action, "tolist") else action
-                }
-                if faith_scores is not None:
-                    result["faith_scores"] = faith_scores.tolist() if hasattr(faith_scores, "tolist") else faith_scores
-                
+                # 如果可视化处理失败，仍然返回动作坐标
+                result = action.tolist() if hasattr(action, "tolist") else action
                 return JSONResponse(result)
             
-            # 返回动作和faith分数
-            result = {
-                "action": action.tolist() if hasattr(action, "tolist") else action
-            }
-            
-            if faith_scores is not None:
-                result["faith_scores"] = faith_scores.tolist() if hasattr(faith_scores, "tolist") else faith_scores
-            
+            # 仅返回动作坐标
+            result = action.tolist() if hasattr(action, "tolist") else action
+
             if double_encode:
                 return JSONResponse(json_numpy.dumps(result))
             else:
