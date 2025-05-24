@@ -42,7 +42,15 @@ def get_prediction_metadata(prediction_dir: str) -> dict:
 
 def get_instruction_from_metadata(metadata: dict) -> str:
     """从元数据中获取指令"""
-    return metadata.get("instruction", "无指令")
+    return metadata.get("instruction", "no instruction")
+
+def get_inference_time_from_metadata(metadata: dict) -> str:
+    """从元数据中获取推理时间"""
+    inference_time = metadata.get("inference_time", None)
+    if inference_time is not None:
+        return f"{inference_time:.4f}秒"
+    return "unknown inference time"
+
 
 def create_video_from_predictions(
     predictions_dir: str, 
@@ -95,13 +103,14 @@ def create_video_from_predictions(
         if image.shape[0] != height or image.shape[1] != width:
             image = cv2.resize(image, (width, height))
         
-        # 获取指令（可选）
+        # 获取指令（可选）和推理时间
         metadata = get_prediction_metadata(pred_dir)
         instruction = get_instruction_from_metadata(metadata)
-        
+        inference_time = get_inference_time_from_metadata(metadata)
+
         # 添加额外信息到图像
         timestamp, session_id = parse_timestamp_from_dir(pred_dir)
-        info_text = f"#{idx+1} | {timestamp} | {instruction}"
+        info_text = f"#{idx+1} | {timestamp} | Inference time: {inference_time} | {instruction}"
         
         # 在图像顶部添加信息条
         info_bar = np.ones((40, width, 3), dtype=np.uint8) * 255
