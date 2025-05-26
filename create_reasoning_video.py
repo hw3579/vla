@@ -48,7 +48,7 @@ def get_inference_time_from_metadata(metadata: dict) -> str:
     """从元数据中获取推理时间"""
     inference_time = metadata.get("inference_time", None)
     if inference_time is not None:
-        return f"{inference_time:.4f}秒"
+        return f"{inference_time:.4f}s"
     return "unknown inference time"
 
 
