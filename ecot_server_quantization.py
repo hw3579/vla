@@ -265,7 +265,7 @@ def create_reasoning_image(image, generated_text, tags):
     return reasoning_img, metadata
 
 
-def save_prediction_data(image, action, reasoning_image, generated_text, metadata, instruction):
+def save_prediction_data(image, action, reasoning_image, generated_text, metadata, instruction, inference_time=None):
     """保存预测数据到文件夹"""
     # 创建用于保存数据的目录
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -292,12 +292,18 @@ def save_prediction_data(image, action, reasoning_image, generated_text, metadat
     with open(metadata_path, "w") as f:
         # 确保numpy数组可以序列化
         action_list = action.tolist() if hasattr(action, "tolist") else action
-        json.dump({
+        save_data = {
             "action": action_list,
             "metadata": metadata,
             "timestamp": timestamp,
             "instruction": instruction
-        }, f, indent=2)
+        }
+        
+        # 添加推理时间到元数据
+        if inference_time is not None:
+            save_data["inference_time"] = inference_time
+            
+        json.dump(save_data, f, indent=2)
     
     return save_dir
 
@@ -447,7 +453,8 @@ class ECotServerQuantization:
                         reasoning_image, 
                         generated_text, 
                         metadata,
-                        instruction
+                        instruction,
+                        inference_time  # 添加推理时间参数
                     )
                     logging.info(f"预测数据已保存到: {save_dir}")
                 

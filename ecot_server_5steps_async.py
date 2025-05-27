@@ -298,7 +298,7 @@ def create_reasoning_image(image, generated_text, tags):
     reasoning_img = Image.fromarray(np.concatenate([img_arr, text_arr], axis=1))
     return reasoning_img, metadata
 
-def save_prediction_data(image, action, reasoning_image, generated_text, metadata, instruction):
+def save_prediction_data(image, action, reasoning_image, generated_text, metadata, instruction, inference_time=None):
     """保存预测数据到文件夹"""
     # 创建用于保存数据的目录
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -324,18 +324,21 @@ def save_prediction_data(image, action, reasoning_image, generated_text, metadat
     
     # 保存元数据和动作
     metadata_path = os.path.join(save_dir, "metadata.json")
+    save_data = {
+        "action": action.tolist() if hasattr(action, "tolist") else action,
+        "metadata": metadata,
+        "timestamp": timestamp,
+        "instruction": instruction
+    }
+    
+    # 添加推理时间到元数据
+    if inference_time is not None:
+        save_data["inference_time"] = inference_time
+    
     with open(metadata_path, "w") as f:
-        # 确保numpy数组可以序列化
-        action_list = action.tolist() if hasattr(action, "tolist") else action
-        json.dump({
-            "action": action_list,
-            "metadata": metadata,
-            "timestamp": timestamp,
-            "instruction": instruction
-        }, f, indent=2)
+        json.dump(save_data, f, indent=2)
     
     return save_dir
-
 
 # === 服务器接口 ===
 class ECotServerAsync:
@@ -391,7 +394,7 @@ class ECotServerAsync:
         # 使用该会话的提示管理器生成提示
         prompts = self.sessions[session_id].generate_prompts(instruction)
         return prompts[0]
-
+    
     def predict_action(self, payload: Dict[str, Any]) -> JSONResponse:
         try:
             # 支持double_encode情况
@@ -420,6 +423,9 @@ class ECotServerAsync:
             if time_since_last < 0.1:  # 如果上次推理是在100ms以内
                 torch.cuda.empty_cache()  # 清理GPU内存
                 
+            # 添加推理时间记录
+            start_time = time.time()
+                
             # 运行模型推理
             prompt = self.get_prompt(instruction, session_id)
             torch.manual_seed(seed)
@@ -439,6 +445,10 @@ class ECotServerAsync:
                 
                 # 记录当前推理时间
                 self.last_inference_time = time.time()
+                
+                # 计算推理时间
+                inference_time = self.last_inference_time - start_time
+                logging.info(f"推理时间: {inference_time:.4f}秒")
                 
                 generated_texts = self.processor.batch_decode(generated_ids)
                 generated_text = generated_texts[-1]
@@ -480,7 +490,8 @@ class ECotServerAsync:
                         reasoning_image, 
                         generated_text, 
                         metadata,
-                        instruction
+                        instruction,
+                        inference_time  # 添加推理时间参数
                     )
                     logging.info(f"预测数据已保存到: {save_dir}")
                 

@@ -298,7 +298,7 @@ def create_reasoning_image(image, generated_text, tags):
     reasoning_img = Image.fromarray(np.concatenate([img_arr, text_arr], axis=1))
     return reasoning_img, metadata
 
-def save_prediction_data(image, action, reasoning_image, generated_text, metadata, instruction, step_num=None):
+def save_prediction_data(image, action, reasoning_image, generated_text, metadata, instruction, step_num=None, inference_time=None):
     """保存预测数据到文件夹"""
     # 创建用于保存数据的目录
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -334,12 +334,15 @@ def save_prediction_data(image, action, reasoning_image, generated_text, metadat
     # 如有步骤信息，加入元数据
     if step_num is not None:
         save_data["step"] = step_num
+    
+    # 添加推理时间到元数据
+    if inference_time is not None:
+        save_data["inference_time"] = inference_time
         
     with open(metadata_path, "w") as f:
         json.dump(save_data, f, indent=2)
     
     return save_dir
-
 
 # === 服务器接口 ===
 class ECotServerBatch:
@@ -496,7 +499,8 @@ class ECotServerBatch:
                         generated_text, 
                         metadata,
                         instruction,
-                        step_num
+                        step_num,
+                        inference_time  # 添加推理时间参数
                     )
                     if step_num is not None:
                         logging.info(f"步骤 {step_num}: 预测数据已保存到: {save_dir}")
