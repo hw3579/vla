@@ -38,6 +38,7 @@ reasoning_image = np.array(response["reasoning_image"])
 ```
 """
 
+import time
 import datetime
 import uuid
 import os
