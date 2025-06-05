@@ -1,3 +1,12 @@
 predictions/
 test_results/
 *.mp4
+
+# pycache files
+__pycache__/
+# Python bytecode files
+*.py[cod]
+# Cython debug symbols
+cython_debug/
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
