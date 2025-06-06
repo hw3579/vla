@@ -9,6 +9,7 @@ import uuid
 import os
 import sys
 import json
+# 导入JSON-Numpy扩展以支持numpy数组的JSON序列化
 import json_numpy
 json_numpy.patch()
 
