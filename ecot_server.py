@@ -126,13 +126,16 @@ class ECotServer:
             image = Image.fromarray(np.array(image_array, dtype=np.uint8)).convert("RGB")
             unnorm_key = payload.get("unnorm_key", "bridge_orig")
             seed = payload.get("seed", 0)
-
-            # 运行模型推理
-            prompt = self.get_prompt(instruction)
-            torch.manual_seed(seed)
-
+            
+            # 获取会话ID（如果有）
+            session_id = payload.get("session_id", None)
+            
             # 添加推理时间记录
             start_time = time.time()
+            
+            # 运行模型推理
+            prompt = self.get_prompt(instruction, session_id)
+            torch.manual_seed(seed)
             
             try:
                 inputs = self.processor(prompt, image).to(self.device, dtype=torch.bfloat16)
@@ -148,12 +151,14 @@ class ECotServer:
                 inference_time = time.time() - start_time
                 logging.info(f"推理时间: {inference_time:.4f}秒")
                 
+                # 如果使用5step模式，更新会话状态
+                if self.use_5step and session_id is not None and session_id in self.sessions:
+                    self.sessions[session_id].update_history(generated_text)
+                    
             except Exception as e:
                 logging.error(traceback.format_exc())
-                raise HTTPException(
-                    status_code=400, 
-                    detail=f"模型处理错误: {str(e)}"
-                )
+                # 确保返回有效的JSON响应
+                return JSONResponse({"error": f"模型处理错误: {str(e)}"}, status_code=400)
 
             # 创建可视化推理图像
             try:
@@ -168,36 +173,34 @@ class ECotServer:
                         generated_text, 
                         metadata,
                         instruction,
-                        inference_time  # 添加推理时间参数
+                        inference_time
                     )
-                logging.info(f"预测数据已保存到: {save_dir}")
+                    logging.info(f"预测数据已保存到: {save_dir}")
                 
             except Exception as e:
                 logging.error(f"创建或保存推理数据时出错: {str(e)}")
                 logging.error(traceback.format_exc())
-                # 如果可视化处理失败，仍然返回动作坐标
-                return JSONResponse(action.tolist() if hasattr(action, "tolist") else action)
+                # 确保返回有效的JSON响应
+                result = action.tolist() if hasattr(action, "tolist") else action
+                return JSONResponse({"action": result, "error": f"可视化处理失败: {str(e)}"})
             
-            # 仅返回动作坐标
-            result = action.tolist() if hasattr(action, "tolist") else action
-
+            # 确保返回有效的JSON格式
+            result = {"action": action.tolist() if hasattr(action, "tolist") else action}
+            
             if double_encode:
                 return JSONResponse(json_numpy.dumps(result))
             else:
                 return JSONResponse(result)
                 
-        except HTTPException:
-            raise
+        except HTTPException as he:
+            # 确保HTTP异常也返回JSON格式
+            return JSONResponse({"error": he.detail}, status_code=he.status_code)
         except Exception as e:
             logging.error(traceback.format_exc())
-            raise HTTPException(
-                status_code=500,
-                detail=(
-                    f"服务器错误: {str(e)}\n"
-                    "请确保您的请求符合预期格式:\n"
-                    "{'image': np.ndarray, 'instruction': str}\n"
-                    "可选参数: 'unnorm_key': str, 'seed': int"
-                ),
+            # 确保所有其他异常也返回JSON格式
+            return JSONResponse(
+                {"error": f"服务器错误: {str(e)}"},
+                status_code=500
             )
 
     def run(self, host: str = "0.0.0.0", port: int = 8000) -> None:
