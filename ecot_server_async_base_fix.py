@@ -247,13 +247,44 @@ class ECotServerAsyncBase:
                 # 如果可视化处理失败，仍然返回动作坐标
                 return JSONResponse(action.tolist() if hasattr(action, "tolist") else action)
             
-            # 只返回动作数组（7个值）
-            result = action.tolist() if hasattr(action, "tolist") else action
+
+
+######################################
+
+            # 安全返回动作结果
+            try:
+                # 不要调用tolist()，保留numpy数组格式
+                if not isinstance(action, np.ndarray):
+                    # 如果不是numpy数组，确保转换为numpy数组
+                    result = np.array(action, dtype=np.float32)
+                else:
+                    result = action
+                    
+                # 记录结果用于调试
+                logging.info(f"返回动作: {result}")
+                
+                # 依赖json_numpy处理numpy数组的序列化
+                if double_encode:
+                    return JSONResponse(json_numpy.dumps(result))
+                else:
+                    return JSONResponse(result)  # json_numpy会处理numpy数组的序列化
+                    
+            except Exception as e:
+                logging.error(f"返回结果时出错: {str(e)}")
+                logging.error(traceback.format_exc())
+                # 返回简单的默认JSON
+                return JSONResponse(np.zeros(7))  # 返回numpy零数组而不是列表
+
+
+
+
+            # # 只返回动作数组（7个值）
+            # result = action.tolist() if hasattr(action, "tolist") else action
             
-            if double_encode:
-                return JSONResponse(json_numpy.dumps(result))
-            else:
-                return JSONResponse(result)
+            # if double_encode:
+            #     return JSONResponse(json_numpy.dumps(result))
+            # else:
+            #     return JSONResponse(result)
                 
         except HTTPException:
             raise
@@ -272,6 +303,25 @@ class ECotServerAsyncBase:
 
     def run(self, host: str = "0.0.0.0", port: int = 8000) -> None:
         self.app = FastAPI()
+
+####################### 解决推理服务器响应慢导致无法返回正确的json问题 #######################
+        from fastapi.responses import JSONResponse
+        from starlette.exceptions import HTTPException as StarletteHTTPException
+        from starlette.status import HTTP_503_SERVICE_UNAVAILABLE
+
+        # HTTP 异常统一返回 JSON
+        @self.app.exception_handler(StarletteHTTPException)
+        async def handle_http_exception(request, exc):
+            if exc.status_code == HTTP_503_SERVICE_UNAVAILABLE:
+                return JSONResponse(
+                    status_code=503,
+                    content={"error": "服务器当前繁忙，请稍后重试（并发受限）"}
+                )
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={"error": exc.detail or "服务异常"}
+            )
+###############################################################
 
         # 添加CORS中间件
         self.app.add_middleware(
