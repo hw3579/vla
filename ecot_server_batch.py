@@ -280,7 +280,7 @@ class ECotServerBatch:
                         generated_text, 
                         metadata,
                         instruction,
-                        step_num,
+                        # step_num,
                         inference_time  # 添加推理时间参数
                     )
                     if step_num is not None:
